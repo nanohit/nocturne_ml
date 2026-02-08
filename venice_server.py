@@ -21,9 +21,13 @@ from dataclasses import dataclass, field
 # Configuration
 # ==============================================================================
 
-# Venice.ai accounts - add new accounts here, commit & push to deploy
-# All accounts use the same password: London2006)
-ACCOUNTS = [
+# GitHub Gist for persistent account storage
+# Set GITHUB_TOKEN env var on Render.com for write access
+GITHUB_GIST_ID = os.environ.get('GITHUB_GIST_ID', '')
+GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN', '')
+
+# Default accounts (fallback if Gist unavailable)
+DEFAULT_ACCOUNTS = [
     {"email": "franciscovangelderen@protostarbusinesssolutions.com", "password": "London2006)"},
     {"email": "oscarmoralesj225@mysticmossmurmur.store", "password": "London2006)"},
     {"email": "deankoko8gg@kieunam.site", "password": "London2006)"},
@@ -44,8 +48,80 @@ ACCOUNTS = [
     {"email": "joecianfanellina7e@missionbulldogs.org", "password": "London2006)"},
     {"email": "rogermazzoniioem@wmslegalservices.com", "password": "London2006)"},
     {"email": "travismoulin3n3q@vinheduca.life", "password": "London2006)"},
-    # Add new accounts below this line:
 ]
+
+# Will be populated on startup
+ACCOUNTS = []
+
+
+async def load_accounts_from_gist():
+    """Load accounts from GitHub Gist"""
+    global ACCOUNTS
+
+    if not GITHUB_GIST_ID:
+        print("[Config] No GITHUB_GIST_ID set, using default accounts")
+        ACCOUNTS = list(DEFAULT_ACCOUNTS)
+        return
+
+    try:
+        async with ClientSession() as http:
+            url = f"https://api.github.com/gists/{GITHUB_GIST_ID}"
+            headers = {"Accept": "application/vnd.github+json"}
+            if GITHUB_TOKEN:
+                headers["Authorization"] = f"Bearer {GITHUB_TOKEN}"
+
+            async with http.get(url, headers=headers) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    content = data.get("files", {}).get("accounts.json", {}).get("content", "")
+                    if content:
+                        gist_accounts = json.loads(content)
+                        ACCOUNTS = gist_accounts
+                        print(f"[Config] Loaded {len(ACCOUNTS)} accounts from Gist")
+                        return
+    except Exception as e:
+        print(f"[Config] Failed to load from Gist: {e}")
+
+    # Fallback to defaults
+    print("[Config] Using default accounts")
+    ACCOUNTS = list(DEFAULT_ACCOUNTS)
+
+
+async def save_accounts_to_gist():
+    """Save accounts to GitHub Gist"""
+    if not GITHUB_GIST_ID or not GITHUB_TOKEN:
+        print("[Config] Cannot save to Gist: missing GITHUB_GIST_ID or GITHUB_TOKEN")
+        return False
+
+    try:
+        async with ClientSession() as http:
+            url = f"https://api.github.com/gists/{GITHUB_GIST_ID}"
+            headers = {
+                "Accept": "application/vnd.github+json",
+                "Authorization": f"Bearer {GITHUB_TOKEN}",
+            }
+
+            # Only save email (password is always the same)
+            accounts_data = [{"email": a["email"], "password": a["password"]} for a in ACCOUNTS]
+
+            payload = {
+                "files": {
+                    "accounts.json": {
+                        "content": json.dumps(accounts_data, indent=2)
+                    }
+                }
+            }
+
+            async with http.patch(url, headers=headers, json=payload) as resp:
+                if resp.status == 200:
+                    print(f"[Config] Saved {len(ACCOUNTS)} accounts to Gist")
+                    return True
+                else:
+                    print(f"[Config] Failed to save to Gist: {resp.status}")
+                    return False
+    except Exception as e:
+        print(f"[Config] Error saving to Gist: {e}")
+        return False
 
 DEFAULT_MODEL = "zai-org-glm-4.7-flash"  # GLM 4.7 Flash - follows instructions better
 
@@ -404,6 +480,8 @@ async def handle_health(request: web.Request) -> web.Response:
 
 async def handle_add_account(request: web.Request) -> web.Response:
     """Admin endpoint to add a new Venice account"""
+    global ACCOUNTS
+
     try:
         data = await request.json()
     except:
@@ -422,12 +500,20 @@ async def handle_add_account(request: web.Request) -> web.Response:
         if acc.email == email:
             return web.json_response({"error": "Account already exists"}, status=400)
 
-    # Add new account
+    # Add new account to pool
     new_account = Account(email=email, password=password)
     pool.accounts.append(new_account)
 
-    print(f"[Admin] Added account: {email}")
-    return web.json_response({"success": True, "total_accounts": len(pool.accounts)})
+    # Also add to global ACCOUNTS and save to Gist
+    ACCOUNTS.append({"email": email, "password": password})
+    saved = await save_accounts_to_gist()
+
+    print(f"[Admin] Added account: {email} (persisted: {saved})")
+    return web.json_response({
+        "success": True,
+        "total_accounts": len(pool.accounts),
+        "persisted": saved
+    })
 
 
 async def handle_index(request: web.Request) -> web.Response:
@@ -1851,6 +1937,8 @@ async def handle_index(request: web.Request) -> web.Response:
 # ==============================================================================
 
 async def on_startup(app):
+    # Load accounts from Gist (or use defaults)
+    await load_accounts_from_gist()
     app['pool'] = AccountPool(ACCOUNTS)
 
 async def on_cleanup(app):
