@@ -15,15 +15,15 @@ import os
 from aiohttp import web, ClientSession, CookieJar
 from typing import Optional, List, Dict
 from dataclasses import dataclass, field
-from pathlib import Path
 
 
 # ==============================================================================
 # Configuration
 # ==============================================================================
 
-# Default accounts (can be overridden via NOCTURNE_ACCOUNTS env var)
-DEFAULT_ACCOUNTS = [
+# Venice.ai accounts - add new accounts here, commit & push to deploy
+# All accounts use the same password: London2006)
+ACCOUNTS = [
     {"email": "franciscovangelderen@protostarbusinesssolutions.com", "password": "London2006)"},
     {"email": "oscarmoralesj225@mysticmossmurmur.store", "password": "London2006)"},
     {"email": "deankoko8gg@kieunam.site", "password": "London2006)"},
@@ -44,31 +44,8 @@ DEFAULT_ACCOUNTS = [
     {"email": "joecianfanellina7e@missionbulldogs.org", "password": "London2006)"},
     {"email": "rogermazzoniioem@wmslegalservices.com", "password": "London2006)"},
     {"email": "travismoulin3n3q@vinheduca.life", "password": "London2006)"},
+    # Add new accounts below this line:
 ]
-
-def load_accounts():
-    """Load accounts from env var or use defaults"""
-    accounts = list(DEFAULT_ACCOUNTS)
-
-    # Check for additional accounts in environment variable
-    # Format: email1:password1,email2:password2 or just email1,email2 (uses default password)
-    extra_accounts = os.environ.get('NOCTURNE_EXTRA_ACCOUNTS', '')
-    if extra_accounts:
-        default_pwd = os.environ.get('NOCTURNE_DEFAULT_PASSWORD', 'London2006)')
-        for entry in extra_accounts.split(','):
-            entry = entry.strip()
-            if not entry:
-                continue
-            if ':' in entry:
-                email, pwd = entry.split(':', 1)
-                accounts.append({"email": email.strip(), "password": pwd.strip()})
-            else:
-                accounts.append({"email": entry, "password": default_pwd})
-        print(f"[Config] Loaded {len(extra_accounts.split(','))} extra accounts from env")
-
-    return accounts
-
-ACCOUNTS = load_accounts()
 
 DEFAULT_MODEL = "zai-org-glm-4.7-flash"  # GLM 4.7 Flash - follows instructions better
 
