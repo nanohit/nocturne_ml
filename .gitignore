@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local
+*.log
+.env.local
+
+# Experimental/debug files (not needed for deployment)
+venice_browser_auth.py
+venice_chat_endpoint.json
+venice_chat_page.png
+venice_chat_sent.png
+venice_clerk_auth.py
+venice_client.py
+venice_debug.py
+venice_direct_chat.py
+venice_explore.py
+venice_get_apikey.py
+venice_intercept.py
+venice_login.json
+venice_models.py
+venice_multi.py
+venice_server_action.py
+venice_session_chat.py
+venice_test.py
+venice_web_chat.py
